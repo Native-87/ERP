@@ -26,15 +26,19 @@ exports.getAll = async (req, res) => {
       ];
     }
 
-    // Operario can only see OTs assigned to them or created by them
+    // Role-based filtering
     if (req.user.role === 'operario') {
       where[Op.or] = [
         { assigned_to: req.user.id },
         { created_by: req.user.id },
       ];
-    } else if (req.user.role === 'supervisor' && req.user.area) {
-      // Supervisor can only see OTs in their area
-      where.sector = req.user.area;
+    } else if (req.user.role === 'supervisor') {
+      // Supervisors can see anything they created OR everything in their assigned area
+      const supervisorFilters = [{ created_by: req.user.id }];
+      if (req.user.area) {
+        supervisorFilters.push({ sector: req.user.area });
+      }
+      where[Op.or] = supervisorFilters;
     }
 
     const { rows, count } = await WorkOrder.findAndCountAll({
