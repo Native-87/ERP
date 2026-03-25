@@ -248,7 +248,6 @@ const MantenimientoDashboard = () => {
             </p>
           </div>
         </div>
-        </div>
       </div>
 
       {/* Tarjetas KPI de Resumen */}
