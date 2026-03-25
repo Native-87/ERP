@@ -241,18 +241,14 @@ const MantenimientoDashboard = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-surface-900 dark:text-white">
-              Dashboard de Mantenimiento
+              Gestión de Mantenimiento
             </h1>
             <p className="text-surface-500 text-sm mt-1">
-              {isAdminOrSupervisor ? 'Vista general y gestión completa de OTs.' : 'Vista de OTs asignadas a tu cuenta.'}
+              {isAdminOrSupervisor ? 'Panel administrativo y gestión de OTs.' : 'Vista de OTs asignadas a tu cuenta.'}
             </p>
           </div>
         </div>
-        {isAdminOrSupervisor && (
-          <button onClick={() => { setEditItem(null); setForm({ title: '', description: '', priority: 'media', sector: '', assigned_to: '', due_date: '' }); setShowModal(true); }} className="btn-primary shadow-md shadow-primary-500/20" id="btn-new-ot">
-            <Plus size={18} className="mr-2" /> Nueva OT
-          </button>
-        )}
+        </div>
       </div>
 
       {/* Tarjetas KPI de Resumen */}
@@ -578,6 +574,20 @@ const MantenimientoDashboard = () => {
           <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setShowPurchaseModal(false)} className="btn-secondary">Cancelar</button><button type="submit" className="btn-primary">Emitir Solicitud</button></div>
         </form>
       </Modal>
+
+      {/* Botón Flotante para Nueva OT */}
+      {isAdminOrSupervisor && (
+        <button 
+          onClick={() => { setEditItem(null); setForm({ title: '', description: '', priority: 'media', sector: '', assigned_to: '', due_date: '' }); setShowModal(true); }} 
+          className="fixed bottom-10 right-10 w-16 h-16 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-2xl shadow-primary-500/40 flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-50 group border-4 border-white dark:border-surface-800"
+          id="btn-new-ot-fab"
+        >
+          <Plus size={32} strokeWidth={2.5} />
+          <span className="absolute right-full mr-4 px-3 py-1.5 bg-surface-900/90 backdrop-blur-sm text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-xl border border-white/10">
+            Nueva OT
+          </span>
+        </button>
+      )}
     </div>
   );
 };
