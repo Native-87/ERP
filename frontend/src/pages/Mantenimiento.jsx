@@ -352,6 +352,10 @@ const MantenimientoDashboard = () => {
                       </h3>
                       {alert !== 'green' && <AlertCircle size={16} className={alert === 'red' ? 'text-red-500' : 'text-amber-500'} />}
                     </div>
+                    <div className="flex items-center gap-2 text-xs text-surface-400 mt-1 font-medium bg-surface-100/50 dark:bg-surface-800/50 px-2 py-0.5 rounded border border-surface-200/50 dark:border-surface-700/50 w-fit">
+                      <Clock size={12} />
+                      Creada el: {new Date(ot.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                    </div>
                     
                     <div className="flex gap-2 flex-wrap text-sm">
                       <span className={STATUS_COLORS[ot.status]}>{STATUS_LABELS[ot.status]}</span>
@@ -441,6 +445,7 @@ const MantenimientoDashboard = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Asignar Operario</label><select value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} className="select"><option value="">Sin asignar</option>{users.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}</select></div>
+            <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Fecha de Creación (Auto)</label><input type="text" value={new Date().toLocaleDateString('es-AR')} className="input bg-surface-50 dark:bg-surface-800 text-surface-500 cursor-not-allowed" disabled /></div>
             <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Fecha límite de ejecución</label><input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} className="input" /></div>
           </div>
           <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Instrucciones Detalladas</label><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input min-h-[100px]" rows={4} placeholder="Describe qué necesita reparación o mantenimiento preventivo." /></div>
@@ -483,8 +488,8 @@ const MantenimientoDashboard = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-4 rounded-lg shadow-sm">
               <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Emisor</span><p className="text-sm font-medium text-surface-900 dark:text-white">{selectedOT.creator?.first_name} {selectedOT.creator?.last_name}</p></div>
               <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Responsable</span><p className="text-sm font-medium text-surface-900 dark:text-white">{selectedOT.assignee ? `${selectedOT.assignee.first_name} ${selectedOT.assignee.last_name}` : 'Pendiente Asignación'}</p></div>
+              <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Emisión / Creación</span><p className="text-sm font-bold text-primary-600 dark:text-primary-400">{new Date(selectedOT.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short'})}</p></div>
               <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Vencimiento</span><p className="text-sm font-medium text-red-600 dark:text-red-400">{selectedOT.due_date ? new Date(selectedOT.due_date + 'T12:00:00').toLocaleDateString('es-AR') : 'Sin Fecha'}</p></div>
-              <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Emisión</span><p className="text-sm font-medium text-surface-900 dark:text-white">{new Date(selectedOT.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short'})}</p></div>
             </div>
 
             {selectedOT.digital_signature && (
