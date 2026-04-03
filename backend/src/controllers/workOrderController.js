@@ -202,7 +202,7 @@ exports.changeStatus = async (req, res) => {
     await WorkOrderHistory.create({
       work_order_id: workOrder.id,
       previous_status: previousStatus,
-      new_status: status,
+      new_status: finalStatus,
       changed_by: req.user.id,
       comment,
     });

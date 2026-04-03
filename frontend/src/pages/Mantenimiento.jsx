@@ -5,7 +5,8 @@ import { useTheme } from '../context/ThemeContext';
 import Modal from '../components/Modal';
 import {
   Plus, Search, ClipboardList, Clock, PlayCircle, CheckCircle2, Lock,
-  ArrowRight, Paperclip, Trash2, Edit3, Eye, FileText, AlertCircle, Wrench
+  ArrowRight, Paperclip, Trash2, Edit3, Eye, FileText, AlertCircle, Wrench,
+  Mail, Inbox, Send
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -42,11 +43,12 @@ const MantenimientoDashboard = () => {
   const [showDetail, setShowDetail] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [selectedOT, setSelectedOT] = useState(null);
   const [form, setForm] = useState({ title: '', description: '', priority: 'media', sector: '', assigned_to: '', due_date: '' });
   const [statusForm, setStatusForm] = useState({ status: '', comment: '', digital_signature: false });
-  const [purchaseForm, setPurchaseForm] = useState({ title: '', description: '', quantity: 1, estimatedCost: '', justification: '' });
+  const [purchaseForm, setPurchaseForm] = useState({ title: '', description: '', quantity: 1, estimatedCost: null, justification: '' });
   
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -58,7 +60,7 @@ const MantenimientoDashboard = () => {
       const [otRes, usersRes, prRes] = await Promise.all([
         workOrdersAPI.getAll({ page, search, status: filterStatus || undefined, priority: filterPriority || undefined }),
         isAdminOrSupervisor ? usersAPI.getAll({ limit: 100 }) : Promise.resolve({ data: { users: [] } }),
-        isAdminOrSupervisor ? comprasAPI.getRequests({ status: 'Pendiente' }) : Promise.resolve({ data: [] }),
+        isAdminOrSupervisor ? comprasAPI.getRequests() : Promise.resolve({ data: [] }),
       ]);
       
       let fetchedOTs = otRes.data.workOrders || [];
@@ -74,7 +76,7 @@ const MantenimientoDashboard = () => {
       }
 
       setWorkOrders(fetchedOTs);
-      setPurchaseRequests(fetchedPRs.filter(pr => pr.status === 'Pendiente'));
+      setPurchaseRequests(fetchedPRs);
       setTotalPages(otRes.data.totalPages || 1);
       setUsers(usersRes.data.users || []);
     } catch { 
@@ -128,7 +130,9 @@ const MantenimientoDashboard = () => {
   const handlePurchaseRequest = async (e) => {
     e.preventDefault();
     try {
-      await workOrdersAPI.createPurchaseRequest(selectedOT.id, purchaseForm);
+      const payload = { ...purchaseForm };
+      if (payload.estimatedCost === '') payload.estimatedCost = null;
+      await workOrdersAPI.createPurchaseRequest(selectedOT.id, payload);
       toast.success('Solicitud de compra emitida correctamente');
       setShowPurchaseModal(false);
       // Cambiar estado a esperando repuesto automáticamente
@@ -248,6 +252,28 @@ const MantenimientoDashboard = () => {
             </p>
           </div>
         </div>
+        <div className="flex items-center gap-3">
+          {isAdminOrSupervisor && (
+            <button 
+              onClick={() => setShowInbox(true)} 
+              className={`relative flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all ${purchaseRequests.filter(pr => pr.status === 'Pendiente').length > 0 ? 'bg-primary-50 border-primary-200 text-primary-700 dark:bg-primary-900/20 dark:border-primary-800' : 'bg-surface-50 border-surface-200 text-surface-600 dark:bg-surface-800 dark:border-surface-700'}`}
+              title="Buzón de Solicitudes"
+            >
+              <Mail size={20} className={purchaseRequests.filter(pr => pr.status === 'Pendiente').length > 0 ? 'animate-bounce' : ''} />
+              <span className="font-bold text-sm hidden sm:inline">Buzón de Mensajes</span>
+              {purchaseRequests.filter(pr => pr.status === 'Pendiente').length > 0 && (
+                <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-surface-900">
+                  {purchaseRequests.filter(pr => pr.status === 'Pendiente').length}
+                </span>
+              )}
+            </button>
+          )}
+          {isAdminOrSupervisor && (
+            <button onClick={() => { setEditItem(null); setForm({ title: '', description: '', priority: 'media', sector: '', assigned_to: '', due_date: '' }); setShowModal(true); }} className="btn-primary flex items-center gap-2 shadow-lg shadow-primary-500/20">
+              <Plus size={20} /> <span className="hidden sm:inline">Nueva OT</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tarjetas KPI de Resumen */}
@@ -282,29 +308,7 @@ const MantenimientoDashboard = () => {
         </div>
       </div>
 
-      {/* Alerta de Solicitudes de Compra para Supervisor */}
-      {isAdminOrSupervisor && purchaseRequests.length > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 p-4 rounded-xl flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-bold text-sm">
-            <AlertCircle size={18} />
-            <span>Hay {purchaseRequests.length} solicitudes de repuestos pendientes de evaluación técnica</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {purchaseRequests.map(pr => (
-              <div key={pr.id} className="bg-white dark:bg-surface-900 border border-amber-100 dark:border-amber-800/40 p-3 rounded-lg flex items-center justify-between shadow-sm">
-                <div className="min-w-0 pr-2">
-                  <p className="text-sm font-bold text-surface-900 dark:text-white truncate" title={pr.title}>{pr.title}</p>
-                  <p className="text-[11px] text-surface-500 mt-0.5 truncate">OT #{pr.work_order_id} | Solicitado por: {pr.requester?.first_name || 'Operario'}</p>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <button onClick={() => handlePurchaseStatus(pr.id, 'Aprobada')} className="p-1 px-3 bg-emerald-600 text-white text-[11px] font-bold rounded hover:bg-emerald-700 transition-colors">Aprobar</button>
-                  <button onClick={() => handlePurchaseStatus(pr.id, 'Rechazada')} className="p-1 px-3 bg-red-600 text-white text-[11px] font-bold rounded hover:bg-red-700 transition-colors">Rechazar</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {/* Filtros */}
       <h2 className="text-lg font-bold text-surface-900 dark:text-white pt-2 border-b border-surface-200 dark:border-surface-700 pb-2">Listado de Órdenes de Trabajo</h2>
@@ -352,10 +356,7 @@ const MantenimientoDashboard = () => {
                       </h3>
                       {alert !== 'green' && <AlertCircle size={16} className={alert === 'red' ? 'text-red-500' : 'text-amber-500'} />}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-surface-400 mt-1 font-medium bg-surface-100/50 dark:bg-surface-800/50 px-2 py-0.5 rounded border border-surface-200/50 dark:border-surface-700/50 w-fit">
-                      <Clock size={12} />
-                      Creada el: {new Date(ot.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
-                    </div>
+
                     
                     <div className="flex gap-2 flex-wrap text-sm">
                       <span className={STATUS_COLORS[ot.status]}>{STATUS_LABELS[ot.status]}</span>
@@ -382,9 +383,10 @@ const MantenimientoDashboard = () => {
                       <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Asignado a</span>
                       <span className="text-sm text-surface-900 dark:text-surface-200 truncate">{ot.assignee ? `${ot.assignee.first_name} ${ot.assignee.last_name}` : <span className="text-surface-400 italic">Sin asignar</span>}</span>
                     </div>
-                    <div className="flex flex-col">
+                    <div className="flex flex-col border-l border-surface-200 dark:border-surface-700 pl-3">
                       <span className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider">Fechas Clave</span>
-                      <span className="text-sm block truncate text-surface-900 dark:text-surface-200">Emitida: {new Date(ot.created_at).toLocaleDateString('es-AR')}</span>
+                      <span className="text-[11px] block truncate text-surface-700 dark:text-surface-300">Emisión: {new Date(ot.created_at).toLocaleDateString('es-AR')}</span>
+                      <span className="text-[11px] block truncate text-primary-600 dark:text-primary-400 font-bold">Últ. Cambio: {new Date(ot.updated_at).toLocaleDateString('es-AR')}</span>
                     </div>
                   </div>
                 </div>
@@ -392,8 +394,28 @@ const MantenimientoDashboard = () => {
                 {/* Acciones */}
                 <div className="flex md:flex-col items-center gap-2 mt-4 md:mt-0 w-full md:w-auto p-3 bg-surface-50 md:bg-transparent rounded-lg justify-end md:justify-start">
                   {VALID_TRANSITIONS[ot.status]?.map((nextStatus) => (
-                    <button key={nextStatus} onClick={() => openStatusChange(ot, nextStatus)} className="w-full text-xs py-1.5 px-3 bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-md hover:border-primary-500 hover:text-primary-600 flex items-center justify-center gap-1 transition-colors" title={`Cambiar a ${STATUS_LABELS[nextStatus]}`}>
-                      <ArrowRight size={14} /> {STATUS_LABELS[nextStatus]}
+                    <button 
+                      key={nextStatus} 
+                      onClick={() => {
+                        if (nextStatus === 'esperando_repuesto') {
+                          setSelectedOT(ot);
+                          setPurchaseForm({ 
+                            title: 'Solicitud de repuesto', 
+                            description: '', 
+                            quantity: 1, 
+                            estimatedCost: null, 
+                            justification: `Falta de stock para realizar la reparación indicada en OT #${ot.id}` 
+                          });
+                          setShowPurchaseModal(true);
+                        } else {
+                          openStatusChange(ot, nextStatus);
+                        }
+                      }} 
+                      className={`w-full text-xs py-1.5 px-3 border rounded-md flex items-center justify-center gap-1 transition-all font-bold ${nextStatus === 'esperando_repuesto' ? 'bg-red-600 text-white border-red-600 hover:bg-red-700 shadow-sm' : 'bg-white dark:bg-surface-800 border-surface-200 dark:border-surface-600 hover:border-primary-500 hover:text-primary-600'}`}
+                      title={nextStatus === 'esperando_repuesto' ? 'Emitir Solicitud de Repuesto' : `Cambiar a ${STATUS_LABELS[nextStatus]}`}
+                    >
+                      {nextStatus === 'esperando_repuesto' ? <Plus size={14} /> : <ArrowRight size={14} />}
+                      {nextStatus === 'esperando_repuesto' ? 'Pedir Repuesto' : STATUS_LABELS[nextStatus]}
                     </button>
                   ))}
                   
@@ -445,7 +467,7 @@ const MantenimientoDashboard = () => {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Asignar Operario</label><select value={form.assigned_to} onChange={(e) => setForm({ ...form, assigned_to: e.target.value })} className="select"><option value="">Sin asignar</option>{users.map(u => <option key={u.id} value={u.id}>{u.first_name} {u.last_name}</option>)}</select></div>
-            <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Fecha de Creación (Auto)</label><input type="text" value={new Date().toLocaleDateString('es-AR')} className="input bg-surface-50 dark:bg-surface-800 text-surface-500 cursor-not-allowed" disabled /></div>
+            <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Registro del Sistema</label><div className="flex items-center gap-2 p-2.5 bg-surface-50 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-500 text-sm"><Clock size={16} className="text-primary-500" /> <span>Fecha de alta automática: <strong>{new Date().toLocaleDateString('es-AR')}</strong></span></div></div>
             <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Fecha límite de ejecución</label><input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} className="input" /></div>
           </div>
           <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Instrucciones Detalladas</label><textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input min-h-[100px]" rows={4} placeholder="Describe qué necesita reparación o mantenimiento preventivo." /></div>
@@ -456,6 +478,13 @@ const MantenimientoDashboard = () => {
       {/* Modal - Cambiar Estado */}
       <Modal isOpen={showStatusModal} onClose={() => setShowStatusModal(false)} title={`Actualizar progreso → ${STATUS_LABELS[statusForm.status]}`}>
         <form onSubmit={handleStatusChange} className="space-y-4">
+          <div className="bg-primary-50 dark:bg-primary-900/10 p-3 rounded-lg border border-primary-100 dark:border-primary-800/30 flex items-center gap-3 mb-4">
+            <Clock size={20} className="text-primary-600 dark:text-primary-400" />
+            <div>
+              <p className="text-xs font-bold text-primary-900 dark:text-primary-100">Registro Automático de Fecha/Hora</p>
+              <p className="text-[11px] text-primary-700 dark:text-primary-400">Este cambio quedará registrado con fecha: {new Date().toLocaleDateString('es-AR')}</p>
+            </div>
+          </div>
           <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Reporte / Comentario</label><textarea value={statusForm.comment} onChange={(e) => setStatusForm({ ...statusForm, comment: e.target.value })} className="input min-h-[80px]" rows={3} placeholder="Detalles de lo realizado o problemas detectados..." /></div>
           {statusForm.status === 'cerrada' && (
             <label className="flex items-center gap-3 p-4 rounded-xl bg-surface-100 dark:bg-surface-800 cursor-pointer border border-surface-200 dark:border-surface-700 hover:border-primary-400 transition-colors">
@@ -488,8 +517,9 @@ const MantenimientoDashboard = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 p-4 rounded-lg shadow-sm">
               <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Emisor</span><p className="text-sm font-medium text-surface-900 dark:text-white">{selectedOT.creator?.first_name} {selectedOT.creator?.last_name}</p></div>
               <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Responsable</span><p className="text-sm font-medium text-surface-900 dark:text-white">{selectedOT.assignee ? `${selectedOT.assignee.first_name} ${selectedOT.assignee.last_name}` : 'Pendiente Asignación'}</p></div>
-              <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Emisión / Creación</span><p className="text-sm font-bold text-primary-600 dark:text-primary-400">{new Date(selectedOT.created_at).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short'})}</p></div>
+              <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Emisión / Registro</span><p className="text-sm font-bold text-surface-900 dark:text-white">{new Date(selectedOT.created_at).toLocaleDateString('es-AR')}</p></div>
               <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Vencimiento</span><p className="text-sm font-medium text-red-600 dark:text-red-400">{selectedOT.due_date ? new Date(selectedOT.due_date + 'T12:00:00').toLocaleDateString('es-AR') : 'Sin Fecha'}</p></div>
+              <div><span className="text-xs text-surface-500 uppercase font-semibold block mb-1">Último Cambio</span><p className="text-sm font-bold text-primary-600 dark:text-primary-400">{new Date(selectedOT.updated_at).toLocaleDateString('es-AR')}</p></div>
             </div>
 
             {selectedOT.digital_signature && (
@@ -524,7 +554,7 @@ const MantenimientoDashboard = () => {
                             {duration && <span className="text-[10px] font-bold bg-primary-50 dark:bg-primary-900/20 text-primary-600 px-1.5 py-0.5 rounded-full flex items-center gap-1"><Clock size={10} /> Duración: {duration}</span>}
                           </div>
                           {h.comment && <p className="text-surface-600 dark:text-surface-300 bg-white dark:bg-surface-900 p-2 rounded border border-surface-200 dark:border-surface-800 my-2 shadow-inner leading-relaxed">{h.comment}</p>}
-                          <p className="text-xs text-surface-400 font-medium">Registrado por {h.user?.first_name || h.user?.username} el {new Date(h.created_at).toLocaleString('es-AR')}</p>
+                          <p className="text-xs text-surface-400 font-medium">Registrado por {h.user?.first_name || h.user?.username} el {new Date(h.created_at).toLocaleDateString('es-AR')}</p>
                         </div>
                       </div>
                     );
@@ -547,18 +577,16 @@ const MantenimientoDashboard = () => {
                 </div>
               </div>
             )}
-            {/* Sección de Orden de Compra si es necesario */}
-            {(selectedOT.status === 'pendiente' || selectedOT.status === 'esperando_repuesto') && (
-              <div className="mt-6 p-4 rounded-xl border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 dark:bg-red-900/40 rounded-full text-red-600"><AlertCircle size={20} /></div>
-                  <div>
-                    <h5 className="font-bold text-red-800 dark:text-red-400 text-sm">¿Falta algún repuesto?</h5>
-                    <p className="text-xs text-red-700 dark:text-red-500">Puedes emitir una solicitud de compra ligada a esta OT.</p>
-                  </div>
+            {/* Sección de Orden de Compra unificada con el estado */}
+            {(selectedOT.status === 'pendiente' || selectedOT.status === 'en_curso') && (
+              <div className="mt-6 p-5 rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/30 flex flex-col items-center text-center gap-3">
+                <div className="p-3 bg-red-100 dark:bg-red-900/40 rounded-full text-red-600"><AlertCircle size={24} /></div>
+                <div>
+                  <h5 className="font-bold text-surface-900 dark:text-white">¿No puedes continuar por falta de repuestos?</h5>
+                  <p className="text-xs text-surface-500 mt-1 max-w-sm">Si necesitas un insumo, puedes solicitarlo aquí. La OT pasará automáticamente al estado "Falta de Repuesto".</p>
                 </div>
-                <button onClick={() => { setPurchaseForm({ title: `Repuesto para OT #${selectedOT.id}: ${selectedOT.title}`, description: '', quantity: 1, estimatedCost: '', justification: `Falta de stock para realizar la reparación indicada en OT #${selectedOT.id}` }); setShowPurchaseModal(true); }} className="btn-primary bg-red-600 hover:bg-red-700 border-red-600 text-white shadow-md shadow-red-500/20 whitespace-nowrap">
-                  <Plus size={16} className="mr-1" /> Solicitar Repuesto
+                <button onClick={() => { setPurchaseForm({ title: 'Solicitud de repuesto', description: '', quantity: 1, estimatedCost: null, justification: `Solicitado desde detalle de OT #${selectedOT.id}` }); setShowPurchaseModal(true); }} className="btn-primary bg-red-600 hover:bg-red-700 border-red-600 text-white px-8">
+                  Emitir Solicitud de Repuesto
                 </button>
               </div>
             )}
@@ -567,16 +595,86 @@ const MantenimientoDashboard = () => {
       </Modal>
 
       {/* Modal - Solicitar Compra */}
-      <Modal isOpen={showPurchaseModal} onClose={() => setShowPurchaseModal(false)} title="Nueva Solicitud de Compra de Repuesto" maxWidth="max-w-lg">
+      <Modal isOpen={showPurchaseModal} onClose={() => setShowPurchaseModal(false)} title="Solicitud de repuesto" maxWidth="max-w-lg">
         <form onSubmit={handlePurchaseRequest} className="space-y-4">
           <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Repuesto / Insumo</label><input value={purchaseForm.title} onChange={(e) => setPurchaseForm({ ...purchaseForm, title: e.target.value })} className="input" required /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Cantidad</label><input type="number" min="1" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({ ...purchaseForm, quantity: parseInt(e.target.value) })} className="input" required /></div>
-            <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Costo Estimado (Opcional)</label><input type="number" step="0.01" value={purchaseForm.estimatedCost} onChange={(e) => setPurchaseForm({ ...purchaseForm, estimatedCost: e.target.value })} className="input" placeholder="0.00" /></div>
-          </div>
+          <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Cantidad de unidades requeridas</label><input type="number" min="1" value={purchaseForm.quantity} onChange={(e) => setPurchaseForm({ ...purchaseForm, quantity: parseInt(e.target.value) })} className="input" required /></div>
           <div><label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Justificación Técnica</label><textarea value={purchaseForm.justification} onChange={(e) => setPurchaseForm({ ...purchaseForm, justification: e.target.value })} className="input min-h-[80px]" rows={3} placeholder="Explica por qué es crítico para la OT..." /></div>
           <div className="flex justify-end gap-3 pt-2"><button type="button" onClick={() => setShowPurchaseModal(false)} className="btn-secondary">Cancelar</button><button type="submit" className="btn-primary">Emitir Solicitud</button></div>
         </form>
+      </Modal>
+
+      {/* Modal - Casilla de Mensajes (Inbox) */}
+      <Modal isOpen={showInbox} onClose={() => setShowInbox(false)} title="Casilla de Mensajes - Solicitudes de Repuesto" maxWidth="max-w-2xl">
+        <div className="space-y-4">
+          {purchaseRequests.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-surface-400">
+              <Inbox size={48} className="opacity-20 mb-4" />
+              <p className="font-medium">No tienes mensajes nuevos</p>
+              <p className="text-xs">Todas las solicitudes han sido gestionadas.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-surface-100 dark:divide-surface-800 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
+              {purchaseRequests.map((pr) => (
+                <div key={pr.id} className="py-4 first:pt-0 group hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors rounded-lg px-3">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 font-bold text-sm shrink-0">
+                      {pr.requester?.first_name?.charAt(0) || 'U'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-start mb-1">
+                        <h4 className="text-sm font-bold text-surface-900 dark:text-white truncate">
+                          {pr.requester?.first_name} {pr.requester?.last_name}
+                        </h4>
+                        <span className="text-[10px] text-surface-400 whitespace-nowrap ml-2">
+                          {new Date(pr.createdAt).toLocaleDateString('es-AR')}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-primary-600 dark:text-primary-400 mb-1">
+                        <span className="opacity-60 text-surface-500 uppercase text-[9px] mr-1">Asunto:</span> 
+                        {pr.title} 
+                        <span className="mx-2 text-surface-300">|</span> 
+                        <span className="text-surface-500">OT #{pr.work_order_id}</span>
+                      </p>
+                      <div className="bg-white dark:bg-surface-900 p-3 rounded-lg border border-surface-200 dark:border-surface-700 text-[13px] text-surface-600 dark:text-surface-300 italic mb-3 shadow-sm">
+                        "{pr.justification}"
+                        <div className="mt-2 pt-2 border-t border-surface-100 dark:border-surface-800 flex justify-between items-center not-italic uppercase text-[9px] font-bold tracking-widest text-surface-400">
+                          <span>Cantidad: {pr.quantity} un.</span>
+                          <span className={pr.status === 'Aprobada' ? 'text-emerald-500' : pr.status === 'Rechazada' ? 'text-red-500' : ''}>
+                            Estado: {pr.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        {pr.status === 'Pendiente' ? (
+                          <>
+                            <button 
+                              onClick={() => handlePurchaseStatus(pr.id, 'Rechazada')} 
+                              className="px-4 py-1.5 text-xs font-bold text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 transition-colors"
+                            >
+                              Rechazar
+                            </button>
+                            <button 
+                              onClick={() => handlePurchaseStatus(pr.id, 'Aprobada')} 
+                              className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 shadow-md shadow-emerald-500/20 transition-colors flex items-center gap-1"
+                            >
+                              <Send size={12} /> Aprobar Solicitud
+                            </button>
+                          </>
+                        ) : (
+                          <span className="flex items-center gap-1.5 text-[10px] font-bold text-surface-400 bg-surface-100 dark:bg-surface-800 px-3 py-1 rounded-full uppercase tracking-tighter">
+                            <CheckCircle2 size={12} className={pr.status === 'Aprobada' ? 'text-emerald-500' : 'text-red-400'} />
+                            Acción registrada como {pr.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </Modal>
 
       {/* Botón Flotante para Nueva OT */}

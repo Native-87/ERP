@@ -61,6 +61,8 @@ const WorkOrder = sequelize.define('WorkOrder', {
   },
 }, {
   tableName: 'work_orders',
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
 });
 
 module.exports = WorkOrder;

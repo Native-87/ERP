@@ -29,6 +29,7 @@ const WorkOrderHistory = sequelize.define('WorkOrderHistory', {
   },
 }, {
   tableName: 'work_order_history',
+  createdAt: 'created_at',
   updatedAt: false,
 });
 
